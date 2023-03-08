@@ -81,7 +81,7 @@ IO.on('connection', (socket) => {
     }
   });
 
-  socket.on(fetchRoomDataEvent, (payload: { roomId: string }) => {
+  socket.on(fetchRoomDataEvent, (payload: { roomId: string, freshLoad: boolean }) => {
     try {
       const { roomId } = payload;
       fetchRoomData({ socket, roomId });
@@ -184,6 +184,7 @@ function fetchRoomData({
       users: getUsers({ roomId }),
       estimates: getRoomEstimates({ roomId }),
     };
+    socket.emit(getRoomDataEvent, args);
     IO.to(roomId).emit(getRoomDataEvent, args);
   } catch (e: any) {
     console.error(e.message);
