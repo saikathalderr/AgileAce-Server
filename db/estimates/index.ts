@@ -35,6 +35,6 @@ export function toggleEstimateVisibility({
 
 export function resetEstimates({ roomId }: { roomId: string }) {
   estimates = estimates.filter(
-      (estimate: IEstimate) => estimate.roomId !== roomId
+    (estimate: IEstimate) => estimate.roomId !== roomId
   );
 }

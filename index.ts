@@ -1,5 +1,5 @@
 import express, { Express, Request, Response } from 'express';
-import { Server } from 'socket.io';
+import { Server, Socket } from 'socket.io';
 import dotenv from 'dotenv';
 import http from 'http';
 import cors from 'cors';
@@ -32,7 +32,8 @@ import {
 } from './db/users';
 import {
   addEstimate,
-  getRoomEstimates, resetEstimates,
+  getRoomEstimates,
+  resetEstimates,
   toggleEstimateVisibility,
 } from './db/estimates';
 
@@ -58,12 +59,10 @@ IO.on('connection', (socket) => {
 
   socket.on(createRoomEvent, (payload: IRoom) => {
     try {
-      const room: string = payload.roomId;
+      const { roomId } = payload;
       addUser(payload);
-      socket.join(room);
-      socket
-        .to(room)
-        .emit(fetchRoomDataEvent, { roomId: payload.roomId });
+      socket.join(roomId);
+      fetchRoomData({ socket, roomId });
     } catch (e: any) {
       console.error(e.message);
       return e.message;
@@ -72,26 +71,20 @@ IO.on('connection', (socket) => {
 
   socket.on(joinRoomEvent, (payload: IRoom) => {
     try {
-      const room: string = payload.roomId;
+      const { roomId } = payload;
       addUser(payload);
-      socket.join(room);
-      socket
-        .to(room)
-        .emit(fetchRoomDataEvent, { roomId: payload.roomId });
+      socket.join(roomId);
+      fetchRoomData({ socket, roomId });
     } catch (e: any) {
       console.error(e.message);
       return e.message;
     }
   });
 
-  socket.on(fetchRoomDataEvent, ({ roomId }: { roomId: string }) => {
+  socket.on(fetchRoomDataEvent, (payload: { roomId: string }) => {
     try {
-      const args: IRoomData = {
-        room: roomId,
-        users: getUsers({ roomId }),
-        estimates: getRoomEstimates({ roomId }),
-      };
-      socket.emit(getRoomDataEvent, args);
+      const { roomId } = payload;
+      fetchRoomData({ socket, roomId });
     } catch (e: any) {
       console.error(e.message);
       return e.message;
@@ -103,10 +96,8 @@ IO.on('connection', (socket) => {
       const { roomId, userId } = payload;
       const deletedUser: IUser = removeUser({ userId, roomId });
       socket.leave(roomId);
-      socket
-        .to(roomId)
-        .emit(userLeftEvent, `${deletedUser.fullName} left`);
-      socket.to(roomId).emit(fetchRoomDataEvent, { roomId });
+      IO.to(roomId).emit(userLeftEvent, `${deletedUser.fullName} left`);
+      fetchRoomData({ socket, roomId });
     } catch (e: any) {
       console.error(e.message);
       return e.message;
@@ -123,13 +114,15 @@ IO.on('connection', (socket) => {
         roomId,
         userId,
       });
-      socket.to(roomId).emit(fetchRoomDataEvent, { roomId });
+      fetchRoomData({ socket, roomId });
     }
   );
 
   socket.on(giveEstimateEvent, (payload: IEstimate) => {
     try {
+      const { roomId } = payload;
       addEstimate(payload);
+      fetchRoomData({ socket, roomId });
     } catch (e: any) {
       console.error(e.message);
       return e.message;
@@ -145,7 +138,7 @@ IO.on('connection', (socket) => {
         if (notEstimates)
           throw new Error('no estimates on this room yet!');
         toggleEstimateVisibility({ roomId });
-        socket.to(roomId).emit(fetchRoomDataEvent, { roomId });
+        fetchRoomData({ socket, roomId });
       } catch (e: any) {
         console.error(e.message);
         return e.message;
@@ -159,8 +152,8 @@ IO.on('connection', (socket) => {
       const notEstimates = !getRoomEstimates({ roomId }).length;
       if (notEstimates)
         throw new Error('no estimates on this room yet!');
-      resetEstimates({ roomId })
-      socket.to(roomId).emit(fetchRoomDataEvent, { roomId });
+      resetEstimates({ roomId });
+      fetchRoomData({ socket, roomId });
     } catch (e: any) {
       console.error(e.message);
       return e.message;
@@ -176,3 +169,24 @@ IO.on('connection', (socket) => {
 server.listen(port, () => {
   console.log(`⚡️: server is running on ${port}`);
 });
+
+function fetchRoomData({
+  socket,
+  roomId,
+}: {
+  socket: Socket;
+  roomId: string;
+}) {
+  if (!socket || !roomId) return;
+  try {
+    const args: IRoomData = {
+      room: roomId,
+      users: getUsers({ roomId }),
+      estimates: getRoomEstimates({ roomId }),
+    };
+    IO.to(roomId).emit(getRoomDataEvent, args);
+  } catch (e: any) {
+    console.error(e.message);
+    return e.message;
+  }
+}
