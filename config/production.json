@@ -1,4 +1,4 @@
 {
     "host": "EXTERNAL_HOSTNAME",
-    "port": "PORT"
+    "port": "0.0.0.0"
 }
