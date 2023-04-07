@@ -1,5 +1,6 @@
 import express, { Express, Request, Response } from 'express';
 import { Server, Socket } from 'socket.io';
+import dotenv from 'dotenv';
 import http from 'http';
 import cors from 'cors';
 import {
@@ -35,8 +36,8 @@ import {
   resetEstimates,
   toggleEstimateVisibility,
 } from './db/estimates';
-import config from 'config'
 
+dotenv.config();
 const app: Express = express();
 
 app.use(cors());
@@ -47,7 +48,7 @@ const IO = new Server(server, {
     origin: 'http://127.0.0.1:5173',
   },
 });
-const port: Number = config.get('port') || 3000;
+const port: Number = Number(process.env.PORT) || 8080;
 
 app.get('/', (req: Request, res: Response) => {
   res.send('Express with Ts server is up and running...');
